@@ -1,7 +1,7 @@
 
-  # Web Design with Login_Register (Copy)
+  # SkillConnect 4.0
 
-  This is a code bundle for Web Design with Login_Register (Copy). 
+  This is a code bundle for SkillConnect 4.0. 
 
   ## Running the code
 
