@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   Brain,
@@ -15,6 +15,8 @@ import {
   Filter,
 } from "lucide-react";
 import { trainingRecommendations } from "../../data/mockData";
+import { apiClient, TrainingRecommendation } from "../../api/client";
+import { useApp } from "../../context/AppContext";
 
 const LEVEL_COLORS: Record<string, string> = {
   Beginner: "bg-green-100 text-green-700",
@@ -29,10 +31,26 @@ const PRICE_COLORS: Record<string, string> = {
 
 export function TrainingPage() {
   const navigate = useNavigate();
+  const { state } = useApp();
   const [enrolled, setEnrolled] = useState<string[]>([]);
   const [filterLevel, setFilterLevel] = useState("all");
+  const [trainings, setTrainings] = useState<TrainingRecommendation[]>(trainingRecommendations);
+  const [apiNotice, setApiNotice] = useState("");
 
-  const filteredTrainings = trainingRecommendations.filter(
+  useEffect(() => {
+    apiClient
+      .getTrainingRecommendations(state.selectedJob?.id)
+      .then((data) => {
+        setTrainings(data.length ? data : trainingRecommendations);
+        setApiNotice("");
+      })
+      .catch(() => {
+        setTrainings(trainingRecommendations);
+        setApiNotice("Backend belum aktif, sementara memakai data pelatihan demo.");
+      });
+  }, [state.selectedJob?.id]);
+
+  const filteredTrainings = trainings.filter(
     (t) => filterLevel === "all" || t.level === filterLevel
   );
 
@@ -66,17 +84,21 @@ export function TrainingPage() {
           <div>
             <p className="font-semibold mb-1">AI Menemukan Pelatihan Terbaik untuk Anda</p>
             <p className="text-white/80 text-sm leading-relaxed">
-              Berdasarkan analisis skill gap, AI kami memilih <strong>{trainingRecommendations.length} kursus</strong> yang 
-              paling relevan. Jika Anda menyelesaikan semua pelatihan ini, peluang karir Anda bisa meningkat hingga{" "}
-              <strong>300%</strong>.
+              Berdasarkan analisis skill gap, sistem memilih <strong>{trainings.length} kursus</strong> yang 
+              paling relevan untuk menutup gap prioritas Anda.
             </p>
           </div>
         </div>
+        {apiNotice && (
+          <div className="mb-6 p-3 bg-yellow-50 border border-yellow-100 rounded-xl text-sm text-yellow-700">
+            {apiNotice}
+          </div>
+        )}
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-8">
           {[
-            { label: "Pelatihan Direkomendasikan", value: trainingRecommendations.length, icon: BookOpen, color: "text-indigo-600", bg: "bg-indigo-50" },
+            { label: "Pelatihan Direkomendasikan", value: trainings.length, icon: BookOpen, color: "text-indigo-600", bg: "bg-indigo-50" },
             { label: "Sudah Terdaftar", value: enrolled.length, icon: CheckCircle, color: "text-green-600", bg: "bg-green-50" },
             { label: "Rata-rata Rating", value: "4.7★", icon: Star, color: "text-yellow-600", bg: "bg-yellow-50" },
           ].map((item, i) => (

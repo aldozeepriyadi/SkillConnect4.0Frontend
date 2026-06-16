@@ -11,7 +11,57 @@ import { SkillGapPage } from "./components/skillgap/SkillGapPage";
 import { TrainingPage } from "./components/training/TrainingPage";
 import { DashboardPage } from "./components/dashboard/DashboardPage";
 import { CompanyDashboard } from "./components/company/CompanyDashboard";
+import { LoginRequired } from "./components/guards/LoginRequired";
+import { ProfileRequired } from "./components/guards/ProfileRequired";
 import { NotFound } from "./components/NotFound";
+
+function ProtectedProfilePage() {
+  return (
+    <LoginRequired>
+      <ProfilePage />
+    </LoginRequired>
+  );
+}
+
+function ProtectedDashboardPage() {
+  return (
+    <ProfileRequired>
+      <DashboardPage />
+    </ProfileRequired>
+  );
+}
+
+function ProtectedJobsPage() {
+  return (
+    <ProfileRequired>
+      <JobsPage />
+    </ProfileRequired>
+  );
+}
+
+function ProtectedScreeningPage() {
+  return (
+    <ProfileRequired>
+      <ScreeningPage />
+    </ProfileRequired>
+  );
+}
+
+function ProtectedSkillGapPage() {
+  return (
+    <ProfileRequired>
+      <SkillGapPage />
+    </ProfileRequired>
+  );
+}
+
+function ProtectedTrainingPage() {
+  return (
+    <ProfileRequired>
+      <TrainingPage />
+    </ProfileRequired>
+  );
+}
 
 export const router = createBrowserRouter([
   {
@@ -23,12 +73,12 @@ export const router = createBrowserRouter([
       { path: "register", Component: RegisterPage },
       { path: "company/register", Component: CompanyRegisterPage },
       { path: "company/dashboard", Component: CompanyDashboard },
-      { path: "profile", Component: ProfilePage },
-      { path: "jobs", Component: JobsPage },
-      { path: "screening", Component: ScreeningPage },
-      { path: "skillgap", Component: SkillGapPage },
-      { path: "training", Component: TrainingPage },
-      { path: "dashboard", Component: DashboardPage },
+      { path: "profile", Component: ProtectedProfilePage },
+      { path: "jobs", Component: ProtectedJobsPage },
+      { path: "screening", Component: ProtectedScreeningPage },
+      { path: "skillgap", Component: ProtectedSkillGapPage },
+      { path: "training", Component: ProtectedTrainingPage },
+      { path: "dashboard", Component: ProtectedDashboardPage },
       { path: "*", Component: NotFound },
     ],
   },

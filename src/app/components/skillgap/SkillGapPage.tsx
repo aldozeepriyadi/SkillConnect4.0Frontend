@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   TrendingUp,
@@ -11,13 +12,30 @@ import {
 import { skillGapData } from "../../data/mockData";
 import { useApp } from "../../context/AppContext";
 import { Logo } from "../Logo";
+import { apiClient, SkillGapItem } from "../../api/client";
 
 export function SkillGapPage() {
   const { state } = useApp();
   const navigate = useNavigate();
+  const [apiSkillGap, setApiSkillGap] = useState<SkillGapItem[]>(state.skillGap);
+  const [missingSkills, setMissingSkills] = useState<string[]>(state.screeningResult?.missing_skills || []);
 
-  const totalGap = skillGapData.reduce((acc, s) => acc + s.gap, 0);
-  const avgGap = Math.round(totalGap / skillGapData.length);
+  useEffect(() => {
+    if (!state.selectedJob) return;
+    apiClient
+      .getSkillGap(state.selectedJob.id)
+      .then((data) => {
+        setApiSkillGap(data.skill_gap || []);
+        setMissingSkills(data.missing_skills || []);
+      })
+      .catch(() => {
+        setApiSkillGap(state.skillGap);
+      });
+  }, [state.selectedJob?.id]);
+
+  const activeSkillGap = apiSkillGap.length ? apiSkillGap : skillGapData;
+  const totalGap = activeSkillGap.reduce((acc, s) => acc + s.gap, 0);
+  const avgGap = Math.round(totalGap / activeSkillGap.length);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -43,14 +61,14 @@ export function SkillGapPage() {
           {[
             {
               label: "Skill Dianalisis",
-              value: skillGapData.length,
+              value: activeSkillGap.length,
               color: "text-indigo-600",
               bg: "bg-indigo-50",
               icon: BarChart3,
             },
             {
               label: "Skill Perlu Ditingkatkan",
-              value: skillGapData.filter((s) => s.gap > 20).length,
+              value: activeSkillGap.filter((s) => s.gap > 20).length,
               color: "text-red-600",
               bg: "bg-red-50",
               icon: AlertTriangle,
@@ -64,7 +82,7 @@ export function SkillGapPage() {
             },
             {
               label: "Skill Hampir Cukup",
-              value: skillGapData.filter((s) => s.gap <= 20).length,
+              value: activeSkillGap.filter((s) => s.gap <= 20).length,
               color: "text-green-600",
               bg: "bg-green-50",
               icon: CheckCircle,
@@ -87,7 +105,7 @@ export function SkillGapPage() {
             <p className="font-semibold mb-1">Insight dari AI SkillConnect4.0</p>
             <p className="text-white/80 text-sm leading-relaxed">
               Berdasarkan analisis mendalam terhadap profil Anda dan kebutuhan industri, 
-              terdapat <strong>kesenjangan utama</strong> pada skill Machine Learning dan Cloud Computing. 
+              terdapat <strong>kesenjangan utama</strong> pada skill {missingSkills.slice(0, 2).join(" dan ") || "Machine Learning dan Cloud Computing"}. 
               Dengan mengikuti pelatihan yang direkomendasikan, peluang Anda lolos screening dapat meningkat hingga <strong>85%</strong>.
             </p>
           </div>
@@ -100,7 +118,7 @@ export function SkillGapPage() {
             Detail Analisis Skill Gap
           </h2>
           <div className="space-y-6">
-            {skillGapData.map((item, i) => (
+            {activeSkillGap.map((item, i) => (
               <div key={i}>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
@@ -171,7 +189,12 @@ export function SkillGapPage() {
             Rekomendasi AI untuk Menutup Gap
           </h2>
           <div className="space-y-3">
-            {[
+            {(missingSkills.length ? missingSkills.map((skill, i) => ({
+                skill,
+                action: `Ikuti pelatihan ${skill} dan praktikkan melalui proyek kecil yang relevan`,
+                priority: i < 2 ? "Tinggi" : "Sedang",
+                color: i < 2 ? "red" : "orange",
+              })) : [
               {
                 skill: "Machine Learning",
                 action: "Ikuti kursus ML Fundamentals dan praktikkan dengan proyek nyata",
@@ -196,7 +219,7 @@ export function SkillGapPage() {
                 priority: "Rendah",
                 color: "green",
               },
-            ].map((rec, i) => (
+            ]).map((rec, i) => (
               <div key={i} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl">
                 <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
                   rec.color === "red"

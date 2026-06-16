@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import {
   Eye,
   EyeOff,
@@ -18,10 +18,11 @@ type LoginMode = "jobseeker" | "company";
 export function LoginPage() {
   const { login, loginAsCompany } = useApp();
   const navigate = useNavigate();
+  const location = useLocation();
+  const authRequiredMessage = (location.state as { authRequiredMessage?: string } | null)?.authRequiredMessage;
   const [mode, setMode] = useState<LoginMode>("jobseeker");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [companyName, setCompanyName] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -33,17 +34,18 @@ export function LoginPage() {
       setError("Email dan kata sandi wajib diisi.");
       return;
     }
-    if (mode === "company" && !companyName) {
-      setError("Nama perusahaan wajib diisi.");
+    setLoading(true);
+    const ok = mode === "company"
+      ? await loginAsCompany(email, password)
+      : await login(email, password);
+    if (!ok) {
+      setError("Login gagal. Pastikan akun sudah terdaftar dan kata sandi benar.");
+      setLoading(false);
       return;
     }
-    setLoading(true);
-    await new Promise((r) => setTimeout(r, 1000));
     if (mode === "company") {
-      loginAsCompany(email, password, companyName);
       navigate("/company/dashboard");
     } else {
-      login(email, password);
       navigate("/dashboard");
     }
     setLoading(false);
@@ -172,25 +174,14 @@ export function LoginPage() {
               <p className="text-sm text-red-600">{error}</p>
             </div>
           )}
+          {authRequiredMessage && !error && (
+            <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-100 rounded-lg mb-5">
+              <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+              <p className="text-sm text-amber-700">{authRequiredMessage}</p>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Company Name — only for company mode */}
-            {isCompany && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Nama Perusahaan</label>
-                <div className="relative">
-                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="text"
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    placeholder="PT. Nama Perusahaan Anda"
-                    className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
-                </div>
-              </div>
-            )}
-
             {/* Email */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
@@ -269,8 +260,8 @@ export function LoginPage() {
             <p className="text-xs text-gray-500 text-center">
               <span className="font-medium">Demo:</span>{" "}
               {isCompany
-                ? "Masukkan nama perusahaan & email apa saja untuk mencoba portal perusahaan"
-                : "Masukkan email & password apa saja untuk masuk sebagai pencari kerja"}
+                ? "Gunakan akun perusahaan yang sudah terdaftar. Seed demo: hr@techcorp.id / password123"
+                : "Daftar akun terlebih dahulu, lalu login untuk memakai backend SkillConnect"}
             </p>
           </div>
 

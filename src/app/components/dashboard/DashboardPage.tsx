@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router";
+import { useEffect, useState } from "react";
 import {
   Brain,
   Briefcase,
@@ -15,13 +16,25 @@ import {
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { mockJobs, trainingRecommendations } from "../../data/mockData";
+import { apiClient, TrainingRecommendation } from "../../api/client";
+import { Job } from "../../context/AppContext";
 
 export function DashboardPage() {
   const { state } = useApp();
   const navigate = useNavigate();
+  const [jobs, setJobs] = useState<Job[]>(mockJobs);
+  const [trainings, setTrainings] = useState<TrainingRecommendation[]>(trainingRecommendations);
 
-  const topJobs = mockJobs.slice(0, 3);
-  const topTrainings = trainingRecommendations.slice(0, 2);
+  useEffect(() => {
+    apiClient.getJobs().then((data) => setJobs(data.length ? data : mockJobs)).catch(() => setJobs(mockJobs));
+    apiClient
+      .getTrainingRecommendations(state.selectedJob?.id)
+      .then((data) => setTrainings(data.length ? data : trainingRecommendations))
+      .catch(() => setTrainings(trainingRecommendations));
+  }, [state.selectedJob?.id]);
+
+  const topJobs = jobs.slice(0, 3);
+  const topTrainings = trainings.slice(0, 2);
 
   const flowSteps = [
     {

@@ -38,8 +38,8 @@ export function ScreeningPage() {
       setAnalyzeStep((prev) => {
         if (prev >= analyzeSteps.length - 1) {
           clearInterval(interval);
-          setTimeout(() => {
-            runScreening();
+          setTimeout(async () => {
+            await runScreening();
             setPhase("result");
           }, 500);
           return prev;
@@ -52,6 +52,7 @@ export function ScreeningPage() {
 
   const passed = state.screeningStatus === "passed";
   const job = state.selectedJob;
+  const result = state.screeningResult;
 
   if (phase === "analyzing") {
     return (
@@ -140,9 +141,9 @@ export function ScreeningPage() {
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  { label: "Skor Kecocokan", value: `${job?.match}%`, color: "text-green-600" },
-                  { label: "Kelengkapan Berkas", value: "95%", color: "text-green-600" },
-                  { label: "Relevansi Skill", value: "87%", color: "text-blue-600" },
+                  { label: "Skor Kecocokan", value: `${result?.score ?? job?.match}%`, color: "text-green-600" },
+                  { label: "Kelengkapan Berkas", value: `${result?.components?.profile_completeness ?? 95}%`, color: "text-green-600" },
+                  { label: "Relevansi Skill", value: `${result?.components?.skill ?? 87}%`, color: "text-blue-600" },
                   { label: "Status", value: "Lolos ✓", color: "text-green-600" },
                 ].map((item, i) => (
                   <div key={i} className="bg-gray-50 rounded-xl p-4">
@@ -222,9 +223,9 @@ export function ScreeningPage() {
               </h3>
               <div className="grid grid-cols-2 gap-4 mb-4">
                 {[
-                  { label: "Skor Kecocokan", value: `${job?.match}%`, color: "text-orange-600" },
-                  { label: "Kelengkapan Berkas", value: "72%", color: "text-orange-600" },
-                  { label: "Relevansi Skill", value: "58%", color: "text-red-500" },
+                  { label: "Skor Kecocokan", value: `${result?.score ?? job?.match}%`, color: "text-orange-600" },
+                  { label: "Kelengkapan Berkas", value: `${result?.components?.profile_completeness ?? 72}%`, color: "text-orange-600" },
+                  { label: "Relevansi Skill", value: `${result?.components?.skill ?? 58}%`, color: "text-red-500" },
                   { label: "Status", value: "Belum Lolos", color: "text-red-500" },
                 ].map((item, i) => (
                   <div key={i} className="bg-gray-50 rounded-xl p-4">
@@ -235,7 +236,7 @@ export function ScreeningPage() {
               </div>
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-gray-600 mb-2">Kekurangan yang terdeteksi:</p>
-                {["Skill Machine Learning perlu ditingkatkan", "Sertifikasi cloud belum ada", "Pengalaman relevan kurang dari yang disyaratkan"].map(
+                {(result?.explanation?.length ? result.explanation : ["Skill Machine Learning perlu ditingkatkan", "Sertifikasi cloud belum ada", "Pengalaman relevan kurang dari yang disyaratkan"]).map(
                   (item, i) => (
                     <div key={i} className="flex items-center gap-2 text-sm text-gray-600">
                       <XCircle className="w-4 h-4 text-red-400 flex-shrink-0" />

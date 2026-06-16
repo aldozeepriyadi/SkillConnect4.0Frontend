@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import {
   User,
   MapPin,
@@ -39,10 +39,13 @@ const SKILL_SUGGESTIONS = [
 export function ProfilePage() {
   const { state, saveProfile } = useApp();
   const navigate = useNavigate();
+  const location = useLocation();
+  const profileRequiredMessage = (location.state as { profileRequiredMessage?: string } | null)?.profileRequiredMessage;
   const [step, setStep] = useState(0);
   const [skillInput, setSkillInput] = useState("");
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const [form, setForm] = useState<UserProfile>({
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState<UserProfile>(() => state.profile || {
     name: state.user?.name || "",
     email: state.user?.email || "",
     phone: "",
@@ -89,7 +92,7 @@ export function ProfilePage() {
       if (!form.desiredSalary) newErrors.desiredSalary = "Ekspektasi gaji harus dipilih";
     } else if (currentStep === 3) {
       // Validasi Dokumen
-      if (!form.cv) newErrors.cv = "CV harus diupload";
+      if (!form.cv && !form.cvFileName) newErrors.cv = "CV harus diupload";
     }
 
     setErrors(newErrors);
@@ -165,8 +168,14 @@ export function ProfilePage() {
     }
   };
 
-  const handleSubmit = () => {
-    saveProfile(form);
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    const ok = await saveProfile(form);
+    setSubmitting(false);
+    if (!ok) {
+      setErrors({ submit: "Gagal menyimpan profil ke backend. Pastikan backend aktif dan Anda sudah login." });
+      return;
+    }
     navigate("/jobs");
   };
 
@@ -182,6 +191,16 @@ export function ProfilePage() {
             AI kami membutuhkan informasi ini untuk mencarikan pekerjaan terbaik untuk Anda
           </p>
         </div>
+
+        {profileRequiredMessage && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-amber-800">Profil belum lengkap</p>
+              <p className="text-sm text-amber-700 mt-0.5">{profileRequiredMessage}</p>
+            </div>
+          </div>
+        )}
 
         {/* Progress Bar */}
         <div className="mb-8">
@@ -767,7 +786,7 @@ export function ProfilePage() {
             >
               {step === STEPS.length - 1 ? (
                 <>
-                  Simpan & Proses AI
+                  {submitting ? "Menyimpan..." : "Simpan & Proses AI"}
                   <Check className="w-4 h-4" />
                 </>
               ) : (

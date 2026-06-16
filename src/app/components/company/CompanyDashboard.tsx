@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   Building2,
@@ -37,6 +37,7 @@ import {
   Candidate,
 } from "../../data/companyData";
 import { Logo } from "../Logo";
+import { apiClient } from "../../api/client";
 
 type FilterStatus = "all" | "new" | "contacted" | "interview" | "hired";
 
@@ -48,6 +49,7 @@ const STATUS_CONFIG: Record<
   contacted: { label: "Dihubungi", color: "text-indigo-700", bg: "bg-indigo-50 border-indigo-200", icon: Send },
   interview: { label: "Wawancara", color: "text-orange-700", bg: "bg-orange-50 border-orange-200", icon: Calendar },
   hired: { label: "Diterima", color: "text-green-700", bg: "bg-green-50 border-green-200", icon: UserCheck },
+  rejected: { label: "Belum Lolos", color: "text-red-700", bg: "bg-red-50 border-red-200", icon: UserX },
 };
 
 const AVATAR_COLORS = [
@@ -68,9 +70,10 @@ export function CompanyDashboard() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<FilterStatus>("all");
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
-  const [candidates] = useState<Candidate[]>(
+  const [candidates, setCandidates] = useState<Candidate[]>(
     mockCandidates.filter((c) => c.aiScore >= 75)
   );
+  const [jobPostings, setJobPostings] = useState(mockJobPostings);
   const [contactModal, setContactModal] = useState<{ type: "email" | "phone" | "interview"; candidate: Candidate } | null>(null);
   const [contactMessage, setContactMessage] = useState("");
   const [interviewDate, setInterviewDate] = useState("");
@@ -78,6 +81,19 @@ export function CompanyDashboard() {
   const [contactSent, setContactSent] = useState(false);
 
   const company = state.company;
+
+  useEffect(() => {
+    apiClient
+      .getRecruiterDashboard()
+      .then((data) => {
+        if (data.candidates?.length) setCandidates(data.candidates);
+        if (data.jobPostings?.length) setJobPostings(data.jobPostings);
+      })
+      .catch(() => {
+        setCandidates(mockCandidates.filter((c) => c.aiScore >= 75));
+        setJobPostings(mockJobPostings);
+      });
+  }, []);
 
   const filteredCandidates = candidates.filter((c) => {
     const matchSearch =
@@ -267,7 +283,7 @@ export function CompanyDashboard() {
                   </div>
                 )}
                 {filteredCandidates.map((candidate, idx) => {
-                  const statusConf = STATUS_CONFIG[candidate.status];
+                  const statusConf = STATUS_CONFIG[candidate.status] || STATUS_CONFIG.new;
                   const StatusIcon = statusConf.icon;
                   return (
                     <div
@@ -372,7 +388,7 @@ export function CompanyDashboard() {
               </button>
             </div>
             <div className="space-y-4">
-              {mockJobPostings.map((job) => (
+              {jobPostings.map((job) => (
                 <div key={job.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">

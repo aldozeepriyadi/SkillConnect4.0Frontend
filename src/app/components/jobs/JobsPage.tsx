@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   Brain,
@@ -17,6 +17,7 @@ import {
 import { useApp } from "../../context/AppContext";
 import { mockJobs } from "../../data/mockData";
 import { Job } from "../../context/AppContext";
+import { apiClient } from "../../api/client";
 
 const COLORS: Record<string, string> = {
   TC: "from-blue-500 to-indigo-600",
@@ -34,8 +35,33 @@ export function JobsPage() {
   const [filterType, setFilterType] = useState("all");
   const [selectedJobDetail, setSelectedJobDetail] = useState<Job | null>(null);
   const [aiProcessing, setAiProcessing] = useState(false);
+  const [jobs, setJobs] = useState<Job[]>(mockJobs);
+  const [loadingJobs, setLoadingJobs] = useState(true);
+  const [apiNotice, setApiNotice] = useState("");
 
-  const filteredJobs = mockJobs.filter((job) => {
+  useEffect(() => {
+    let mounted = true;
+    apiClient
+      .getJobs()
+      .then((data) => {
+        if (!mounted) return;
+        setJobs(data.length ? data : mockJobs);
+        setSelectedJobDetail(data[0] || mockJobs[0] || null);
+        setApiNotice("");
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setJobs(mockJobs);
+        setSelectedJobDetail(mockJobs[0] || null);
+        setApiNotice("Backend belum aktif, sementara memakai data demo lokal.");
+      })
+      .finally(() => mounted && setLoadingJobs(false));
+    return () => {
+      mounted = false;
+    };
+  }, [state.profile]);
+
+  const filteredJobs = jobs.filter((job) => {
     const matchSearch =
       search === "" ||
       job.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -112,6 +138,16 @@ export function JobsPage() {
               AI menemukan <strong>{filteredJobs.length}</strong> pekerjaan yang cocok untuk Anda
             </span>
           </div>
+          {apiNotice && (
+            <div className="mt-3 p-3 bg-yellow-50 rounded-xl border border-yellow-100 text-sm text-yellow-700 w-fit">
+              {apiNotice}
+            </div>
+          )}
+          {loadingJobs && (
+            <div className="mt-3 p-3 bg-gray-50 rounded-xl border border-gray-100 text-sm text-gray-500 w-fit">
+              Memuat lowongan dari backend...
+            </div>
+          )}
         </div>
 
         {/* Search & Filter */}

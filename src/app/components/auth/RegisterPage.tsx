@@ -53,8 +53,12 @@ export function RegisterPage() {
       return;
     }
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    register(form.name, form.email, form.password);
+    const ok = await register(form.name, form.email, form.password, form.phone);
+    if (!ok) {
+      setError("Registrasi gagal. Email mungkin sudah terdaftar.");
+      setLoading(false);
+      return;
+    }
     navigate("/profile");
     setLoading(false);
   };

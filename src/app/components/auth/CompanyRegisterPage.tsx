@@ -84,8 +84,12 @@ export function CompanyRegisterPage() {
       return;
     }
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    registerCompany(form.picName, form.email, form.password, form.companyName, form.industry);
+    const ok = await registerCompany(form.picName, form.email, form.password, form.companyName, form.industry, form.phone);
+    if (!ok) {
+      setError("Registrasi perusahaan gagal. Email mungkin sudah terdaftar.");
+      setLoading(false);
+      return;
+    }
     navigate("/company/dashboard");
     setLoading(false);
   };

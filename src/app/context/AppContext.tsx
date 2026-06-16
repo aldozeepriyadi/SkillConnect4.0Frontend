@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
+import { apiClient, ScreeningResult, SkillGapItem } from "../api/client";
 
 export interface Education {
   level: string;
@@ -31,8 +32,8 @@ export interface UserProfile {
   skills: string[];
   desiredRole: string;
   desiredSalary: string;
-  cv: string; // base64 atau data URL dari PDF
-  cvFileName: string; // nama file CV
+  cv: string;
+  cvFileName: string;
   portfolio: string;
 }
 
@@ -44,9 +45,14 @@ export interface Job {
   salary: string;
   type: string;
   match: number;
+  matchLabel?: string;
   skills: string[];
   description: string;
   logo: string;
+  status?: string;
+  matchedSkills?: string[];
+  missingSkills?: string[];
+  explanation?: string[];
 }
 
 export type LoginType = "jobseeker" | "company";
@@ -67,19 +73,22 @@ export interface AppState {
   profile: UserProfile | null;
   selectedJob: Job | null;
   screeningStatus: "pending" | "passed" | "failed" | null;
+  screeningResult: ScreeningResult | null;
+  skillGap: SkillGapItem[];
   currentStep: number;
 }
 
 interface AppContextType {
   state: AppState;
-  login: (email: string, password: string) => boolean;
-  loginAsCompany: (email: string, password: string, companyName: string) => boolean;
-  register: (name: string, email: string, password: string) => boolean;
-  registerCompany: (name: string, email: string, password: string, companyName: string, industry: string) => boolean;
+  hasCompletedProfile: () => boolean;
+  login: (email: string, password: string) => Promise<boolean>;
+  loginAsCompany: (email: string, password: string) => Promise<boolean>;
+  register: (name: string, email: string, password: string, phone?: string) => Promise<boolean>;
+  registerCompany: (name: string, email: string, password: string, companyName: string, industry: string, phone?: string) => Promise<boolean>;
   logout: () => void;
-  saveProfile: (profile: UserProfile) => void;
+  saveProfile: (profile: UserProfile) => Promise<boolean>;
   selectJob: (job: Job) => void;
-  runScreening: () => void;
+  runScreening: () => Promise<void>;
   setStep: (step: number) => void;
 }
 
@@ -91,90 +100,131 @@ const defaultState: AppState = {
   profile: null,
   selectedJob: null,
   screeningStatus: null,
+  screeningResult: null,
+  skillGap: [],
   currentStep: 0,
 };
 
 const AppContext = createContext<AppContextType | null>(null);
 
+export function isProfileComplete(profile: UserProfile | null) {
+  if (!profile) return false;
+  return Boolean(
+    profile.name?.trim() &&
+      profile.email?.trim() &&
+      profile.phone?.trim() &&
+      profile.location?.trim() &&
+      profile.desiredRole?.trim() &&
+      profile.desiredSalary?.trim() &&
+      profile.skills?.length > 0 &&
+      profile.educations?.length > 0 &&
+      profile.experiences?.length > 0 &&
+      (profile.cv || profile.cvFileName)
+  );
+}
+
+function authUserToState(res: Awaited<ReturnType<typeof apiClient.login>>) {
+  const isCompany = res.user.role === "recruiter";
+  return {
+    isLoggedIn: true,
+    loginType: isCompany ? "company" as LoginType : "jobseeker" as LoginType,
+    user: isCompany ? null : { name: res.user.name, email: res.user.email },
+    company: isCompany
+      ? {
+          name: res.user.name,
+          email: res.user.email,
+          companyName: res.company?.name || "Perusahaan",
+          industry: res.company?.industry || "Teknologi",
+          logo: res.company?.logo || (res.company?.name || "P").charAt(0).toUpperCase(),
+        }
+      : null,
+  };
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AppState>(defaultState);
+  const [state, setState] = useState(defaultState);
+  const hasCompletedProfile = () => isProfileComplete(state.profile);
 
-  const login = (email: string, _password: string): boolean => {
-    const name = email.split("@")[0];
-    setState((prev) => ({
-      ...prev,
-      isLoggedIn: true,
-      loginType: "jobseeker",
-      user: { name: name.charAt(0).toUpperCase() + name.slice(1), email },
-      company: null,
-      currentStep: prev.profile ? 2 : 1,
-    }));
-    return true;
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const res = await apiClient.login(email, password, "jobseeker");
+      const authState = authUserToState(res);
+      let profile: UserProfile | null = null;
+      try {
+        profile = await apiClient.getProfile();
+      } catch {
+        profile = null;
+      }
+      setState((prev) => ({
+        ...prev,
+        ...authState,
+        profile,
+        currentStep: profile ? 2 : 1,
+      }));
+      return true;
+    } catch {
+      return false;
+    }
   };
 
-  const loginAsCompany = (email: string, _password: string, companyName: string): boolean => {
-    const name = email.split("@")[0];
-    setState((prev) => ({
-      ...prev,
-      isLoggedIn: true,
-      loginType: "company",
-      company: {
-        name: name.charAt(0).toUpperCase() + name.slice(1),
-        email,
-        companyName,
-        industry: "Teknologi",
-        logo: companyName.charAt(0).toUpperCase(),
-      },
-      user: null,
-    }));
-    return true;
+  const loginAsCompany = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const res = await apiClient.login(email, password, "recruiter");
+      setState((prev) => ({ ...prev, ...authUserToState(res) }));
+      return true;
+    } catch {
+      return false;
+    }
   };
 
-  const register = (name: string, email: string, _password: string): boolean => {
-    setState((prev) => ({
-      ...prev,
-      isLoggedIn: true,
-      loginType: "jobseeker",
-      user: { name, email },
-      company: null,
-      currentStep: 1,
-    }));
-    return true;
+  const register = async (name: string, email: string, password: string, phone?: string): Promise<boolean> => {
+    try {
+      const res = await apiClient.register(name, email, password, phone);
+      setState((prev) => ({
+        ...prev,
+        ...authUserToState(res),
+        currentStep: 1,
+      }));
+      return true;
+    } catch {
+      return false;
+    }
   };
 
-  const registerCompany = (
+  const registerCompany = async (
     name: string,
     email: string,
-    _password: string,
+    password: string,
     companyName: string,
-    industry: string
-  ): boolean => {
-    setState((prev) => ({
-      ...prev,
-      isLoggedIn: true,
-      loginType: "company",
-      company: {
-        name,
-        email,
-        companyName,
-        industry,
-        logo: companyName.charAt(0).toUpperCase(),
-      },
-      user: null,
-    }));
-    return true;
+    industry: string,
+    phone?: string
+  ): Promise<boolean> => {
+    try {
+      const res = await apiClient.registerCompany(name, email, password, companyName, industry, phone);
+      setState((prev) => ({ ...prev, ...authUserToState(res) }));
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   const logout = () => {
+    apiClient.clearToken();
     setState(defaultState);
   };
 
-  const saveProfile = (profile: UserProfile) => {
-    setState((prev) => ({
-      ...prev,
-      profile,
-      currentStep: 2,
-    }));
+  const saveProfile = async (profile: UserProfile): Promise<boolean> => {
+    try {
+      const saved = await apiClient.saveProfile(profile);
+      setState((prev) => ({
+        ...prev,
+        profile: saved,
+        currentStep: 2,
+      }));
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   const selectJob = (job: Job) => {
@@ -182,18 +232,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...prev,
       selectedJob: job,
       screeningStatus: "pending",
+      screeningResult: null,
+      skillGap: [],
       currentStep: 3,
     }));
   };
 
-  const runScreening = () => {
+  const runScreening = async () => {
     const job = state.selectedJob;
-    const passed = job ? job.match >= 75 : false;
-    setState((prev) => ({
-      ...prev,
-      screeningStatus: passed ? "passed" : "failed",
-      currentStep: passed ? 4 : 5,
-    }));
+    if (!job) return;
+    try {
+      const result = await apiClient.runScreening(job.id);
+      setState((prev) => ({
+        ...prev,
+        selectedJob: result.job,
+        screeningStatus: result.passed ? "passed" : "failed",
+        screeningResult: result,
+        skillGap: result.skill_gap,
+        currentStep: result.passed ? 4 : 5,
+      }));
+    } catch {
+      const passed = job.match >= 75;
+      setState((prev) => ({
+        ...prev,
+        screeningStatus: passed ? "passed" : "failed",
+        currentStep: passed ? 4 : 5,
+      }));
+    }
   };
 
   const setStep = (step: number) => {
@@ -202,7 +267,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider
-      value={{ state, login, loginAsCompany, register, registerCompany, logout, saveProfile, selectJob, runScreening, setStep }}
+      value={{ state, hasCompletedProfile, login, loginAsCompany, register, registerCompany, logout, saveProfile, selectJob, runScreening, setStep }}
     >
       {children}
     </AppContext.Provider>
